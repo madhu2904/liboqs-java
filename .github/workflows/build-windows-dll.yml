@@ -45,7 +45,7 @@ jobs:
           mvn package -P windows -Dliboqs.include.dir="${{ github.workspace }}/liboqs/build/include" -Dliboqs.lib.dir="${{ github.workspace }}/liboqs/build/lib"
 
       - name: Upload oqs-jni.dll
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: oqs-jni-dll
           path: target/native/windows/oqs-jni.dll
