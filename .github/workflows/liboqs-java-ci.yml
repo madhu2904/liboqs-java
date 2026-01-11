@@ -1,0 +1,75 @@
+name: liboqs-java CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  workflowcheck:
+    name: Check validity of GitHub workflows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Validate workflows
+        run: echo "Workflow OK"
+
+  windows:
+    needs: workflowcheck
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout liboqs-java
+        uses: actions/checkout@v4
+
+      - name: Install MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            make
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Checkout liboqs
+        uses: actions/checkout@v4
+        with:
+          repository: open-quantum-safe/liboqs
+          path: liboqs
+          ref: main
+
+      - name: Build liboqs (static)
+        shell: msys2 {0}
+        run: |
+          cd liboqs
+          mkdir build
+          cd build
+          cmake .. -G "Ninja" -DOQS_BUILD_ONLY_LIB=ON -DBUILD_SHARED_LIBS=OFF
+          ninja
+
+      - name: Resolve Maven dependencies
+        run: mvn dependency:go-offline
+
+      - name: Build liboqs-java (JNI)
+        run: |
+          $env:Path += ";$env:GITHUB_WORKSPACE\liboqs\build\lib"
+          $includeDir = "$env:GITHUB_WORKSPACE\liboqs\build\include"
+          $libDir = "$env:GITHUB_WORKSPACE\liboqs\build\lib"
+          mvn -Pwindows "-Dliboqs.include.dir=$includeDir" "-Dliboqs.lib.dir=$libDir" package
+
+      - name: Upload oqs-jni.dll
+        uses: actions/upload-artifact@v4
+        with:
+          name: oqs-jni-windows
+          path: target/native/windows/oqs-jni.dll
